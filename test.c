@@ -4,28 +4,50 @@
 #include <unistd.h>
 #include <stdio.h>
 #include <string.h>
+#include <stdlib.h>
+
+#include <readline/readline.h>
+#include <readline/history.h>
 
 #include "cache.h"
 
 int main(void)
 {
 	int fd = open("tmpfile",
-			O_RDWR | O_CREAT | O_TRUNC,
+			O_RDWR | O_CREAT,
 			S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH);
 	ftruncate(fd, CACHE_SIZE);
 	assert(fd != -1);
 	cache_init(fd);
 
-	int N =32;
-
-	char s[100];
-	for (int i = 0; i < N; i++) {
-		snprintf(s, sizeof(s), "%dpls", N-i);
-		cache_add( i, s, strlen(s) + 1 );
-	}
-
-	for (int i = 0; i < N; i++) {
-		printf("%s\n", cache_find(N-i-1));
+	while (1) {
+		char cmd;
+		scanf("%c", &cmd);
+		if (cmd == 'q') {
+			break;
+		} else if (cmd == 'f') {
+			int id = -1;
+			scanf("%d", &id);
+			char *res = cache_find(id);
+			if (res == NULL) {
+				printf("id %d was not found\n", id);
+			} else {
+				printf("Found %d: '%s'\n", id, res);
+			}
+		} else if (cmd == 'a') {
+			int id = gen_id();
+			char *s = readline("> ");
+			if (s == NULL) {
+				puts("\n");
+				break;
+			}
+			if (cache_add(id, s, strlen(s) + 1) != NULL) {
+				printf("Added to cache as %d\n", id);
+			} else {
+				printf("Failed to add to cache!\n");
+			}
+			free(s);
+		}
 	}
 
 	return 0;

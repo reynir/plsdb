@@ -17,8 +17,9 @@ typedef struct cache_node {
 	char data[];
 } cache_node;
 
+static cache_node *cache_sentinel = NULL;
+#define CACHE_LAST (cache_sentinel->next)
 static cache_node *cache_start = NULL;
-static cache_node *cache_last = NULL;
 
 int gen_id(void)
 {
@@ -28,7 +29,7 @@ int gen_id(void)
 
 char *cache_find(int id)
 {
-	if (cache_start == NULL) {
+	if (cache_sentinel == NULL || CACHE_LAST == NULL) {
 		return NULL;
 	}
 	cache_node *curr = cache_start;
@@ -49,22 +50,22 @@ char *cache_find(int id)
 char *cache_add(int id, char *data, size_t len)
 {
 	assert( strlen(data) + 1 == len );
-	/* return NULL if the data doesn't fit at all */
-	if ( sizeof(cache_node) + len >= CACHE_SIZE ) {
+	/* cache not initialized or the data doesn't fit at all */
+	if ( cache_sentinel == NULL || sizeof(cache_node) + len >= CACHE_SIZE ) {
 		return NULL;
 	}
 
 	/* First addition */
-	if (cache_last == NULL) {
-		cache_last = cache_start;
-		cache_last->id = id;
-		cache_last->len = len;
-		cache_last->next = cache_last;
-		memcpy( cache_last->data, data, len );
-		return (char *) (cache_last + 1);
+	if (CACHE_LAST == NULL) {
+		CACHE_LAST = cache_start;
+		CACHE_LAST->id = id;
+		CACHE_LAST->len = len;
+		CACHE_LAST->next = CACHE_LAST;
+		memcpy( CACHE_LAST->data, data, len );
+		return CACHE_LAST->data;
 	}
 
-	cache_node *prev = cache_last;
+	cache_node *prev = CACHE_LAST;
 	cache_node *next = prev->next;
 	cache_node *curr = (cache_node *) (prev->data + prev->len) + 1;
 
@@ -87,17 +88,20 @@ char *cache_add(int id, char *data, size_t len)
 	curr->next = next;
 	curr->id = id;
 	curr->len = len;
-	cache_last = prev->next = curr;
+	CACHE_LAST = prev->next = curr;
 	return (char *) (curr + 1);
 }
 
 void cache_init(int fd)
 {
-	cache_start = mmap( NULL, CACHE_SIZE, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0 );
-	if (cache_start == MAP_FAILED) {
+	cache_sentinel = mmap( NULL, CACHE_SIZE, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0 );
+	if (cache_sentinel == MAP_FAILED) {
 		printf( "MAP_FAILED!\n%s\n", strerror(errno) );
 		exit(1);
 	}
-	cache_last = NULL;
+	cache_start = cache_sentinel + 1;
+	cache_sentinel->len = 0xC0FFEE;
+	cache_sentinel->id = -1;
+	CACHE_LAST = NULL;
 }
 
