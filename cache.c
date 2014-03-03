@@ -8,16 +8,17 @@
 #include <sys/mman.h>
 #include <unistd.h>
 
+#include "cache.h"
+
 typedef struct cache_node {
 	int id;
 	struct cache_node *next;
 	size_t len;
+	char data[];
 } cache_node;
 
-#define CACHE_SIZE ((size_t) 4 * 1024)
-
-cache_node *cache_start = NULL;
-cache_node *cache_last = NULL;
+static cache_node *cache_start = NULL;
+static cache_node *cache_last = NULL;
 
 int gen_id(void)
 {
@@ -27,28 +28,28 @@ int gen_id(void)
 
 char *cache_find(int id)
 {
+	if (cache_start == NULL) {
+		return NULL;
+	}
 	cache_node *curr = cache_start;
 	if (curr->id == id) {
-		return (char *) (curr + 1);
-	}
-	if (curr->next == NULL) {
-		return NULL;
+		return curr->data;
 	}
 
 	curr = curr->next;
-	while (curr != NULL && curr != cache_start) {
+	while (curr != cache_start) {
 		if (curr->id == id) {
-			return (char *) (curr + 1);
+			return curr->data;
 		}
 		curr = curr->next;
 	}
 	return NULL;
 }
 
-char *cache_add(int id, char *string, size_t len)
+char *cache_add(int id, char *data, size_t len)
 {
-	assert( strlen(string) + 1 == len );
-	/* return NULL if the string doesn't fit at all */
+	assert( strlen(data) + 1 == len );
+	/* return NULL if the data doesn't fit at all */
 	if ( sizeof(cache_node) + len >= CACHE_SIZE ) {
 		return NULL;
 	}
@@ -58,38 +59,40 @@ char *cache_add(int id, char *string, size_t len)
 		cache_last = cache_start;
 		cache_last->id = id;
 		cache_last->len = len;
-		cache_last->next = NULL;
-		memcpy( cache_last + 1, string, len );
+		cache_last->next = cache_last;
+		memcpy( cache_last->data, data, len );
 		return (char *) (cache_last + 1);
 	}
 
 	cache_node *prev = cache_last;
 	cache_node *next = prev->next;
-	cache_node *curr = (cache_node *) (((char *) (prev + 1)) + prev->len);
+	cache_node *curr = (cache_node *) (prev->data + prev->len) + 1;
 
-	/* if string doesn't fit after curr */
-	if ( (char *) (curr + 1) + len >= (char *) cache_start + CACHE_SIZE ) {
+	/* if data doesn't fit after curr */
+	if ( curr->data + len >= (char *) cache_start + CACHE_SIZE ) {
 		curr = cache_start;
+		next = curr->next;
 	}
 
-	curr->id = id;
-	curr->len = len;
 
 	/* Update the next pointers */
-	while ( curr < next &&
+	while ( curr <= next &&
 			/* Not enough space */
-			(char *) (curr + 1) + len >= (char *) next ) {
+			curr->data + len >= (char *) next ) {
 		/* Free the next cache_node */
 		next = prev->next = next->next;
 	}
 
-	memcpy( curr + 1, string, len );
+	memcpy( curr->data, data, len );
 	curr->next = next;
+	curr->id = id;
+	curr->len = len;
 	cache_last = prev->next = curr;
 	return (char *) (curr + 1);
 }
 
-void cache_init(int fd) {
+void cache_init(int fd)
+{
 	cache_start = mmap( NULL, CACHE_SIZE, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0 );
 	if (cache_start == MAP_FAILED) {
 		printf( "MAP_FAILED!\n%s\n", strerror(errno) );
@@ -98,25 +101,3 @@ void cache_init(int fd) {
 	cache_last = NULL;
 }
 
-int main(void)
-{
-	int fd = open("tmpfile",
-			O_RDWR | O_CREAT | O_TRUNC,
-			S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH);
-	ftruncate(fd, CACHE_SIZE);
-	assert(fd != -1);
-	cache_init(fd);
-
-	char s[100];
-	for (int i = 0; i < 200; i++) {
-		snprintf(s, sizeof(s), "%d pls!", i);
-		cache_add( i, s, strlen(s) + 1 );
-		printf("Put in '%s'\n", cache_find(i));
-	}
-
-	for (int i = 0; i < 200; i++) {
-		printf("%s\n", cache_find(i));
-	}
-
-	return 0;
-}
