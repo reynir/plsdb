@@ -18,7 +18,7 @@ typedef struct cache_node {
 } cache_node;
 
 static cache_node *cache_sentinel = NULL;
-#define CACHE_LAST (cache_sentinel->next)
+#define CACHE_TAIL (cache_sentinel->next)
 static cache_node *cache_start = NULL;
 
 int gen_id(void)
@@ -29,7 +29,7 @@ int gen_id(void)
 
 char *cache_find(int id)
 {
-	if (cache_sentinel == NULL || CACHE_LAST == NULL) {
+	if (cache_sentinel == NULL || CACHE_TAIL == NULL) {
 		return NULL;
 	}
 	cache_node *curr = cache_start;
@@ -56,16 +56,16 @@ char *cache_add(int id, char *data, size_t len)
 	}
 
 	/* First addition */
-	if (CACHE_LAST == NULL) {
-		CACHE_LAST = cache_start;
-		CACHE_LAST->id = id;
-		CACHE_LAST->len = len;
-		CACHE_LAST->next = CACHE_LAST;
-		memcpy( CACHE_LAST->data, data, len );
-		return CACHE_LAST->data;
+	if (CACHE_TAIL == NULL) {
+		CACHE_TAIL = cache_start;
+		CACHE_TAIL->id = id;
+		CACHE_TAIL->len = len;
+		CACHE_TAIL->next = CACHE_TAIL;
+		memcpy( CACHE_TAIL->data, data, len );
+		return CACHE_TAIL->data;
 	}
 
-	cache_node *prev = CACHE_LAST;
+	cache_node *prev = CACHE_TAIL;
 	cache_node *next = prev->next;
 	cache_node *curr = (cache_node *) (prev->data + prev->len) + 1;
 
@@ -88,7 +88,7 @@ char *cache_add(int id, char *data, size_t len)
 	curr->next = next;
 	curr->id = id;
 	curr->len = len;
-	CACHE_LAST = prev->next = curr;
+	CACHE_TAIL = prev->next = curr;
 	return (char *) (curr + 1);
 }
 
@@ -102,6 +102,6 @@ void cache_init(int fd)
 	cache_start = cache_sentinel + 1;
 	cache_sentinel->len = 0xC0FFEE;
 	cache_sentinel->id = -1;
-	CACHE_LAST = NULL;
+	CACHE_TAIL = NULL;
 }
 
