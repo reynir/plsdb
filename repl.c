@@ -11,15 +11,8 @@
 
 #include "cache.h"
 
-int main(void)
+void repl()
 {
-	int fd = open("tmpfile",
-			O_RDWR | O_CREAT,
-			S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH);
-	ftruncate(fd, CACHE_SIZE);
-	assert(fd != -1);
-	cache_init(fd);
-
 	while (1) {
 		char cmd;
 		scanf("%c", &cmd);
@@ -49,6 +42,23 @@ int main(void)
 			free(s);
 			cache_sync();
 		}
+	}
+}
+
+int main(int argc, char *argv[])
+{
+	int fd = open("tmpfile",
+			O_RDWR | O_CREAT,
+			S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH);
+	ftruncate(fd, CACHE_SIZE);
+	assert(fd != -1);
+	cache_init(fd);
+
+	if (argc > 1) {
+		printf("TODO: arguments 'n stuff\n");
+		exit(0);
+	} else {
+		repl();
 	}
 
 	return 0;
