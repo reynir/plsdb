@@ -12,7 +12,7 @@
 
 typedef struct cache_node {
 	int id;
-	struct cache_node *next;
+	size_t next;
 	size_t len;
 	char data[];
 } cache_node;
@@ -20,6 +20,9 @@ typedef struct cache_node {
 static cache_node *cache_sentinel = NULL;
 #define CACHE_TAIL (cache_sentinel->next)
 static cache_node *cache_start = NULL;
+
+#define to_rel(x) ((char *) (x) - (char *) cache_sentinel)
+#define from_rel(x) ((cache_node *) ((char *) cache_sentinel + (x)))
 
 int gen_id(void)
 {
@@ -29,7 +32,7 @@ int gen_id(void)
 
 char *cache_find(int id)
 {
-	if (cache_sentinel == NULL || CACHE_TAIL == NULL) {
+	if (cache_sentinel == NULL || CACHE_TAIL == 0) {
 		return NULL;
 	}
 	cache_node *curr = cache_start;
@@ -37,12 +40,12 @@ char *cache_find(int id)
 		return curr->data;
 	}
 
-	curr = curr->next;
+	curr = from_rel(curr->next);
 	while (curr != cache_start) {
 		if (curr->id == id) {
 			return curr->data;
 		}
-		curr = curr->next;
+		curr = from_rel(curr->next);
 	}
 	return NULL;
 }
@@ -56,40 +59,41 @@ char *cache_add(int id, char *data, size_t len)
 	}
 
 	/* First addition */
-	if (CACHE_TAIL == NULL) {
-		CACHE_TAIL = cache_start;
-		CACHE_TAIL->id = id;
-		CACHE_TAIL->len = len;
-		CACHE_TAIL->next = CACHE_TAIL;
-		memcpy( CACHE_TAIL->data, data, len );
-		return CACHE_TAIL->data;
+	if (CACHE_TAIL == 0) {
+		cache_node *tail = cache_start;
+		CACHE_TAIL = to_rel(tail);
+		tail->id = id;
+		tail->len = len;
+		tail->next = to_rel(tail);
+		memcpy( tail->data, data, len );
+		return tail->data;
 	}
 
-	cache_node *prev = CACHE_TAIL;
-	cache_node *next = prev->next;
-	cache_node *curr = (cache_node *) (prev->data + prev->len) + 1;
+	cache_node *prev = from_rel(CACHE_TAIL);
+	cache_node *next = from_rel(prev->next);
+	cache_node *curr = (cache_node *) (prev->data + prev->len);
 
 	/* if data doesn't fit after curr */
 	if ( curr->data + len >= (char *) cache_start + CACHE_SIZE ) {
 		curr = cache_start;
-		next = curr->next;
+		next = from_rel(curr->next);
 	}
 
 
-	/* Update the next pointers */
+	/* Free nodes if we need more space */
 	while ( curr <= next &&
 			/* Not enough space */
 			curr->data + len >= (char *) next ) {
 		/* Free the next cache_node */
-		next = prev->next = next->next;
+		next = from_rel(prev->next = next->next);
 	}
 
 	memcpy( curr->data, data, len );
-	curr->next = next;
+	curr->next = to_rel(next);
 	curr->id = id;
 	curr->len = len;
-	CACHE_TAIL = prev->next = curr;
-	return (char *) (curr + 1);
+	CACHE_TAIL = prev->next = to_rel(curr);
+	return curr->data;
 }
 
 void cache_init(int fd)
