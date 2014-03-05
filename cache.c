@@ -10,7 +10,8 @@
 
 #include "cache.h"
 
-#define CACHE_MAGIC 123987984
+#define CACHE_MAGIC 0x0cded26c
+#define CACHE_VERSION 2
 
 typedef struct cache_node_s {
 	int id;
@@ -21,6 +22,7 @@ typedef struct cache_node_s {
 
 typedef struct cache_header_s {
 	int magic;
+	int version;
 	int counter;
 	size_t size;
 	size_t tail;
@@ -120,7 +122,16 @@ cache_header *cache_init(int fd, size_t size)
 	}
 	/* TODO: If header->magic !=CACHE_MAGIC then check if the file is
 	 * "empty" (all zeros) */
+	if (header->magic != 0 && header->version != 0 &&
+			(header->magic != CACHE_MAGIC || header->version != CACHE_VERSION)) {
+		fprintf(stderr, header->magic != CACHE_MAGIC
+				? "Not a cache!!!\n"
+				: "Outdated cache!!!\n");
+		munmap(header, size);
+		return NULL;
+	}
 	header->magic = CACHE_MAGIC;
+	header->version = CACHE_VERSION;
 	header->size = size;
 
 	return header;

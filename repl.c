@@ -53,6 +53,7 @@ int main(int argc, char *argv[])
 	ftruncate(fd, DEFAULT_CACHE_SIZE);
 	assert(fd != -1);
 	Cache *cache = cache_init(fd, DEFAULT_CACHE_SIZE);
+	assert(cache != NULL);
 
 	if (argc > 1) {
 		printf("TODO: arguments 'n stuff\n");

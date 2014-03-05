@@ -16,6 +16,7 @@ int main(void)
 	ftruncate(fd, DEFAULT_CACHE_SIZE);
 	assert(fd != -1);
 	Cache *cache = cache_init(fd, 256);
+	assert(cache != NULL);
 
 	char buf[1024];
 	int id;
@@ -27,7 +28,7 @@ int main(void)
 	}
 
 	for (int i = id; i < id + 8; i++) {
-		printf("%s\n", cache_find(cache, i, NULL));
+		printf("%d: %s\n", i, cache_find(cache, i, NULL));
 	}
 
 	cache_sync(cache);
