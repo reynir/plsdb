@@ -100,8 +100,7 @@ void cache_init(int fd)
 		exit(1);
 	}
 	cache_start = cache_sentinel + 1;
-	cache_sentinel->len = 0xC0FFEE;
+	cache_sentinel->len = 0;
 	cache_sentinel->id = -1;
-	CACHE_TAIL = NULL;
 }
 
