@@ -30,19 +30,23 @@ int gen_id(void)
 	return id++;
 }
 
-char *cache_find(int id)
+char *cache_find(int id, size_t *len)
 {
 	if (cache_sentinel == NULL || CACHE_TAIL == 0) {
 		return NULL;
 	}
 	cache_node *curr = cache_start;
 	if (curr->id == id) {
+		if (len != NULL)
+			*len = curr->len;
 		return curr->data;
 	}
 
 	curr = from_rel(curr->next);
 	while (curr != cache_start) {
 		if (curr->id == id) {
+			if (len != NULL)
+				*len = curr->len;
 			return curr->data;
 		}
 		curr = from_rel(curr->next);
@@ -94,6 +98,11 @@ char *cache_add(int id, char *data, size_t len)
 	curr->len = len;
 	CACHE_TAIL = prev->next = to_rel(curr);
 	return curr->data;
+}
+
+int cache_sync(void)
+{
+	return msync(cache_sentinel, CACHE_SIZE, MS_SYNC);
 }
 
 void cache_init(int fd)
