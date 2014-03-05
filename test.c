@@ -13,21 +13,24 @@ int main(void)
 	int fd = open("tmpfile",
 			O_RDWR | O_CREAT,
 			S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH);
-	ftruncate(fd, CACHE_SIZE);
+	ftruncate(fd, DEFAULT_CACHE_SIZE);
 	assert(fd != -1);
-	cache_init(fd);
+	Cache *cache = cache_init(fd, 256);
 
 	char buf[1024];
-	for (int i = 0; i < 32; i++) {
+	int id;
+	for (int i = 0; i < 8; i++) {
 		snprintf(buf, 1024, "#%d Fill %d#", i, i);
-		assert(cache_add(i, buf, strlen(buf) + 1) != NULL);
+		id = cache_add(cache, buf, strlen(buf) + 1);
+		assert(id != -1);
+		id -= i;
 	}
 
-	for (int i = 0; i < 32; i++) {
-		printf("%s\n", cache_find(i, NULL));
+	for (int i = id; i < id + 8; i++) {
+		printf("%s\n", cache_find(cache, i, NULL));
 	}
 
-	cache_sync();
+	cache_sync(cache);
 
 	return 0;
 }

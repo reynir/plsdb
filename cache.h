@@ -1,12 +1,14 @@
 #ifndef CACHE_H
 #define CACHE_H
 
-#define CACHE_SIZE ((size_t) 256)
+#define DEFAULT_CACHE_SIZE ((size_t) 256)
 
-int gen_id(void);
-char *cache_find(int id, size_t *len);
-char *cache_add(int id, char *data, size_t len);
-int cache_sync(void);
-void cache_init(int fd);
+typedef struct cache_header_s Cache;
+
+int gen_id(Cache *cache);
+char *cache_find(Cache *cache, int id, size_t *len);
+int cache_add(Cache *cache, char *data, size_t len);
+int cache_sync(Cache *cache);
+Cache *cache_init(int fd, size_t size);
 
 #endif

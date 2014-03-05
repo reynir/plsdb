@@ -10,77 +10,83 @@
 
 #include "cache.h"
 
-typedef struct cache_node {
+#define CACHE_MAGIC 123987984
+
+typedef struct cache_node_s {
 	int id;
 	size_t next;
 	size_t len;
 	char data[];
 } cache_node;
 
-static cache_node *cache_sentinel = NULL;
-#define CACHE_TAIL (cache_sentinel->next)
-static cache_node *cache_start = NULL;
+typedef struct cache_header_s {
+	int magic;
+	int counter;
+	size_t size;
+	size_t tail;
+	cache_node start[];
+} cache_header;
 
-#define to_rel(x) ((char *) (x) - (char *) cache_sentinel)
-#define from_rel(x) ((cache_node *) ((char *) cache_sentinel + (x)))
+#define to_rel(header, x) ((char *) (x) - (char *) (header))
+#define from_rel(header, x) ((cache_node *) ((char *) (header) + (x)))
 
-int gen_id(void)
+int gen_id(cache_header *header)
 {
-	static int id = 0;
-	return id++;
+	return header->counter = (header->counter + 1 >= 0 ? header->counter + 1 : 0);
 }
 
-char *cache_find(int id, size_t *len)
+char *cache_find(cache_header *header, int id, size_t *len)
 {
-	if (cache_sentinel == NULL || CACHE_TAIL == 0) {
+	if (header == NULL || header->tail == 0) {
 		return NULL;
 	}
-	cache_node *curr = cache_start;
+	cache_node *curr = header->start;
 	if (curr->id == id) {
 		if (len != NULL)
 			*len = curr->len;
 		return curr->data;
 	}
 
-	curr = from_rel(curr->next);
-	while (curr != cache_start) {
+	curr = from_rel(header, curr->next);
+	while (curr != header->start) {
 		if (curr->id == id) {
 			if (len != NULL)
 				*len = curr->len;
 			return curr->data;
 		}
-		curr = from_rel(curr->next);
+		curr = from_rel(header, curr->next);
 	}
 	return NULL;
 }
 
-char *cache_add(int id, char *data, size_t len)
+int cache_add(cache_header *header, char *data, size_t len)
 {
 	assert( strlen(data) + 1 == len );
 	/* cache not initialized or the data doesn't fit at all */
-	if ( cache_sentinel == NULL || sizeof(cache_node) + len >= CACHE_SIZE ) {
-		return NULL;
+	if ( header == NULL || sizeof(cache_node) + len >= header->size - sizeof(*header) ) {
+		return -1;
 	}
+	int id = gen_id(header);
 
 	/* First addition */
-	if (CACHE_TAIL == 0) {
-		cache_node *tail = cache_start;
-		CACHE_TAIL = to_rel(tail);
+	if (header->tail == 0) {
+		cache_node *tail = header->start;
+		header->tail = to_rel(header, tail);
 		tail->id = id;
 		tail->len = len;
-		tail->next = to_rel(tail);
+		tail->next = to_rel(header, tail);
 		memcpy( tail->data, data, len );
-		return tail->data;
+		return id;
 	}
 
-	cache_node *prev = from_rel(CACHE_TAIL);
-	cache_node *next = from_rel(prev->next);
+	cache_node *prev = from_rel(header, header->tail);
+	cache_node *next = from_rel(header, prev->next);
 	cache_node *curr = (cache_node *) (prev->data + prev->len);
 
 	/* if data doesn't fit after curr */
-	if ( curr->data + len >= (char *) cache_start + CACHE_SIZE ) {
-		curr = cache_start;
-		next = from_rel(curr->next);
+	if ( curr->data + len >= (char *) header->start + header->size ) {
+		curr = header->start;
+		next = from_rel(header, curr->next);
 	}
 
 
@@ -89,31 +95,34 @@ char *cache_add(int id, char *data, size_t len)
 			/* Not enough space */
 			curr->data + len >= (char *) next ) {
 		/* Free the next cache_node */
-		next = from_rel(prev->next = next->next);
+		next = from_rel(header, prev->next = next->next);
 	}
 
 	memcpy( curr->data, data, len );
-	curr->next = to_rel(next);
+	curr->next = to_rel(header, next);
 	curr->id = id;
 	curr->len = len;
-	CACHE_TAIL = prev->next = to_rel(curr);
-	return curr->data;
+	header->tail = prev->next = to_rel(header, curr);
+	return id;
 }
 
-int cache_sync(void)
+int cache_sync(cache_header *header)
 {
-	return msync(cache_sentinel, CACHE_SIZE, MS_SYNC);
+	return msync(header, header->size, MS_SYNC);
 }
 
-void cache_init(int fd)
+cache_header *cache_init(int fd, size_t size)
 {
-	cache_sentinel = mmap( NULL, CACHE_SIZE, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0 );
-	if (cache_sentinel == MAP_FAILED) {
+	cache_header *header = mmap( NULL, size, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0 );
+	if (header == MAP_FAILED) {
 		printf( "MAP_FAILED!\n%s\n", strerror(errno) );
 		exit(1);
 	}
-	cache_start = cache_sentinel + 1;
-	cache_sentinel->len = 0;
-	cache_sentinel->id = -1;
+	/* TODO: If header->magic !=CACHE_MAGIC then check if the file is
+	 * "empty" (all zeros) */
+	header->magic = CACHE_MAGIC;
+	header->size = size;
+
+	return header;
 }
 
