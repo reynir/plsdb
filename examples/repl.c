@@ -9,7 +9,7 @@
 #include <readline/readline.h>
 #include <readline/history.h>
 
-#include "cache.h"
+#include "../cache.h"
 
 void repl(Cache *cache)
 {
@@ -47,12 +47,7 @@ void repl(Cache *cache)
 
 int main(int argc, char *argv[])
 {
-	int fd = open("tmpfile",
-			O_RDWR | O_CREAT,
-			S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH);
-	ftruncate(fd, DEFAULT_CACHE_SIZE);
-	assert(fd != -1);
-	Cache *cache = cache_init(fd, DEFAULT_CACHE_SIZE);
+	Cache *cache = cache_init_file("tmpfile", DEFAULT_CACHE_SIZE);
 	assert(cache != NULL);
 
 	if (argc > 1) {

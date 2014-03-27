@@ -2,11 +2,11 @@ CC=clang
 CFLAGS=-g
 LDFLAGS=-lreadline
 
-all: repl test
+all: examples/repl examples/test
 
-repl: cache.o repl.c
+examples/repl: cache.o examples/repl.c
 
-test: cache.o test.c
+examples/test: cache.o examples/test.c
 
 cache.o: cache.c
 
@@ -14,4 +14,5 @@ cache.so: cache.c
 	$(CC) -fPIC -shared cache.c -o cache.so
 
 clean:
-	rm -f repl repl.o cache.o cache.so test test.o
+	rm -f cache.o cache.so
+	rm -f examples/repl examples/test 

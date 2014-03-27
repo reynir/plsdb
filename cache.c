@@ -29,8 +29,17 @@ typedef struct cache_header_s {
 	cache_node start[];
 } cache_header;
 
-#define to_rel(header, x) ((char *) (x) - (char *) (header))
-#define from_rel(header, x) ((cache_node *) ((char *) (header) + (x)))
+// Not sure which one is better...
+//#define to_rel(header, x) ((char *) (x) - (char *) (header))
+size_t to_rel(cache_header *header, cache_node *x)
+{
+	return (char *) x - (char *) header;
+}
+//#define from_rel(header, x) ((cache_node *) ((char *) (header) + (x)))
+cache_node *from_rel(cache_header *header, size_t x)
+{
+	return (cache_node *) ((char *) header + x);
+}
 
 int gen_id(cache_header *header)
 {
@@ -115,7 +124,13 @@ int cache_sync(cache_header *header)
 
 cache_header *cache_init(int fd, size_t size)
 {
-	cache_header *header = mmap( NULL, size, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0 );
+	cache_header *header;
+	if (fd == -1) {
+		header = mmap( NULL, size, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0 );
+	} else {
+		header = mmap( NULL, size, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0 );
+	}
+
 	if (header == MAP_FAILED) {
 		printf( "MAP_FAILED!\n%s\n", strerror(errno) );
 		exit(1);
@@ -137,3 +152,17 @@ cache_header *cache_init(int fd, size_t size)
 	return header;
 }
 
+cache_header *cache_init_file(char *filename, size_t size)
+{
+	int fd = open(filename,
+			O_RDWR | O_CREAT,
+			S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH);
+	assert(fd != -1);
+	ftruncate(fd, size);
+	return cache_init(fd, size);
+}
+
+cache_header *cache_init_ram(size_t size)
+{
+	return cache_init(-1, size);
+}

@@ -6,16 +6,11 @@
 #include <string.h>
 #include <stdlib.h>
 
-#include "cache.h"
+#include "../cache.h"
 
 int main(void)
 {
-	int fd = open("tmpfile",
-			O_RDWR | O_CREAT,
-			S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH);
-	ftruncate(fd, DEFAULT_CACHE_SIZE);
-	assert(fd != -1);
-	Cache *cache = cache_init(fd, 256);
+	Cache *cache = cache_init_file("tmpfile", 256);
 	assert(cache != NULL);
 
 	char buf[1024];
