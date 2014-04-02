@@ -95,7 +95,7 @@ int cache_add(cache_header *header, char *data, size_t len)
 	cache_node *curr = (cache_node *) (prev->data + prev->len);
 
 	/* if data doesn't fit after curr */
-	if ( curr->data + len >= (char *) header->start + header->size ) {
+	if ( curr->data + len >= (char *) header + header->size ) {
 		curr = header->start;
 		next = from_rel(header, curr->next);
 	}

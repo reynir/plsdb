@@ -1,6 +1,8 @@
 #ifndef CACHE_H
 #define CACHE_H
 
+#include <stddef.h>
+
 #define DEFAULT_CACHE_SIZE ((size_t) 256)
 
 typedef struct cache_header_s Cache;
