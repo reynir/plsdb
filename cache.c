@@ -43,7 +43,10 @@ cache_node *from_rel(cache_header *header, size_t x)
 
 int gen_id(cache_header *header)
 {
-	return header->counter = (header->counter + 1 >= 0 ? header->counter + 1 : 0);
+	int res = header->counter++;
+	if (header->counter < 0)
+		header->counter = 0;
+	return res;
 }
 
 char *cache_find(cache_header *header, int id, size_t *len)
